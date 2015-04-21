@@ -44,7 +44,7 @@ class Salesforce(implicit app: Application) {
     }
   }
 
-  def insertRefrigTemp(refrig: String, value: Float): Future[JsValue] = {
+  def insertRefrigTemp(refrig: String, value: Double): Future[JsValue] = {
     val json = Json.obj(
       "Refrigerator__c" -> refrig,
       "Moment__c" -> DateTime.now(),
@@ -64,7 +64,7 @@ class Salesforce(implicit app: Application) {
   }
 
   def getRefrigs: Future[JsArray] = {
-    val soql = s"SELECT Id, Axeda_Device_ID__c FROM Refrigerator__c"
+    val soql = s"SELECT Id, Axeda_Device_ID__c, Latest_Temperature__c, High_Temperature_Threshold__c, Low_Temperature_Threshold__c FROM Refrigerator__c"
 
     ws(s"query/").flatMap {
       _.withQueryString("q" -> soql).get().flatMap { response =>
@@ -83,38 +83,6 @@ class Salesforce(implicit app: Application) {
       _.get().flatMap { response =>
         response.status match {
           case Status.OK =>
-            Future.successful(response.json)
-          case _ =>
-            Future.failed(new IllegalStateException(response.json.toString()))
-        }
-      }
-    }
-  }
-
-  def getRefrigCases(id: String): Future[JsArray] = {
-    val soql = s"SELECT Id FROM Case WHERE Refrigerator__c = '$id' AND Status <> 'Closed'"
-    ws(s"query/").flatMap {
-      _.withQueryString("q" -> soql).get().flatMap { response =>
-        response.status match {
-          case Status.OK =>
-            Future.successful((response.json \ "records").as[JsArray])
-          case _ =>
-            Future.failed(new IllegalStateException(response.json.toString()))
-        }
-      }
-    }
-  }
-
-  def createRefrigCase(id: String, temp: Float): Future[JsValue] = {
-    val json = Json.obj(
-      "Refrigerator__c" -> id,
-      "Origin" -> "Web",
-      "Subject" -> s"Refrigerator temperature is $temp"
-    )
-    ws("sobjects/Case").flatMap {
-      _.post(json).flatMap { response =>
-        response.status match {
-          case Status.CREATED =>
             Future.successful(response.json)
           case _ =>
             Future.failed(new IllegalStateException(response.json.toString()))

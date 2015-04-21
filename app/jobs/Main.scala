@@ -15,38 +15,28 @@ class Main(app: Application) {
     for {
       refrigsJson <- salesforce.getRefrigs
 
-      refrigs = refrigsJson.value.map { js =>
-        val sfId = (js \ "Id").as[String]
-        val axedaId = (js \ "Axeda_Device_ID__c").as[Int]
-        sfId -> axedaId
-      }
-
-      refrigsWithTemp <- Future.sequence {
-        refrigs.map { case (sfId, axedaId) =>
-          for {
-            temp <- axeda.temperature(axedaId)
-            refrig <- salesforce.getRefrig(sfId)
-            latest = (refrig \ "Latest_Temperature__c").asOpt[Float].getOrElse(0.0)
-
-            if temp != latest
-
-            high = (refrig \ "High_Temperature_Threshold__c").as[Float]
-            low = (refrig \ "Low_Temperature_Threshold__c").as[Float]
-
-            tempInsert <- salesforce.insertRefrigTemp(sfId, temp)
-          } yield sfId ->(axedaId, temp)
+      refrigs <- Future.sequence {
+        refrigsJson.value.map { js =>
+          val sfId = (js \ "Id").as[String]
+          val axedaId = (js \ "Axeda_Device_ID__c").as[Int]
+          val latestTemp = (js \ "Latest_Temperature__c").asOpt[Double].getOrElse(0.0)
+          axeda.temperature(axedaId).map { currentTemp =>
+            (sfId, latestTemp, currentTemp)
+          }
         }
       }
 
+      needsUpdate = refrigs.filter { case (_, latestTemp, currentTemp) =>
+        latestTemp != currentTemp
+      }
 
-      /*
-      if (temp > high) || (temp < low)
-      refrigCases <- salesforce.getRefrigCases(refrigId)
+      inserts <- Future.sequence {
+        needsUpdate.map { case (sfId, _, temp) =>
+          salesforce.insertRefrigTemp(sfId, temp)
+        }
+      }
 
-      if refrigCases.value.size == 0
-      caseInsert <- salesforce.createRefrigCase(refrigId, temp)
-      */
-    } yield refrigsWithTemp
+    } yield inserts
   }
 
 }

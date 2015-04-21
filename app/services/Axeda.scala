@@ -1,11 +1,9 @@
 package services
 
-import org.joda.time.DateTime
 import play.api.Application
-import play.api.libs.json.{JsArray, JsObject, Json, JsValue}
-import play.api.libs.ws.{WSResponse, WSRequestHolder, WS}
+import play.api.libs.json.{Json, JsValue}
+import play.api.libs.ws.{WSRequestHolder, WS}
 import play.api.http.{MimeTypes, Status, HeaderNames}
-import play.api.mvc.Results.EmptyContent
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
@@ -41,18 +39,7 @@ class Axeda(implicit app: Application) {
     }
   }
 
-  def asset(id: String): Future[JsValue] = {
-    ws("services/v2/rest/asset/id/" + id).flatMap(_.get()).flatMap { response =>
-      response.status match {
-        case Status.OK =>
-          Future.successful(response.json)
-        case _ =>
-          Future.failed(new IllegalStateException(response.body))
-      }
-    }
-  }
-
-  def temperature(assetId: Int): Future[Float] = {
+  def temperature(assetId: Int): Future[Double] = {
     val json = Json.obj(
       "assetId" -> assetId,
       "name" -> "temperature"
@@ -61,15 +48,15 @@ class Axeda(implicit app: Application) {
     ws("services/v2/rest/dataItem/findCurrentValues")
       .flatMap(_.post(json))
       .flatMap { response =>
-      response.status match {
-        case Status.OK =>
-          (response.json \\ "value").headOption.map(_.as[String].toFloat).fold {
-            Future.failed[Float](new IllegalStateException(response.body))
-          } (Future.successful)
-        case _ =>
-          Future.failed(new IllegalStateException(response.body))
+        response.status match {
+          case Status.OK =>
+            (response.json \\ "value").headOption.map(_.as[String].toDouble).fold {
+              Future.failed[Double](new IllegalStateException(response.body))
+            } (Future.successful)
+          case _ =>
+            Future.failed(new IllegalStateException(response.body))
+        }
       }
-    }
   }
 
 }
