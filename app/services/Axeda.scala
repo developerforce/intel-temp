@@ -52,9 +52,9 @@ class Axeda(implicit app: Application) {
     }
   }
 
-  def temperature(id: String): Future[Float] = {
+  def temperature(assetId: Int): Future[Float] = {
     val json = Json.obj(
-      "assetId" -> 503,
+      "assetId" -> assetId,
       "name" -> "temperature"
     )
 
@@ -65,9 +65,7 @@ class Axeda(implicit app: Application) {
         case Status.OK =>
           (response.json \\ "value").headOption.map(_.as[String].toFloat).fold {
             Future.failed[Float](new IllegalStateException(response.body))
-          } { temp =>
-            Future.successful(temp)
-          }
+          } (Future.successful)
         case _ =>
           Future.failed(new IllegalStateException(response.body))
       }

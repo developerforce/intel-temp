@@ -63,6 +63,21 @@ class Salesforce(implicit app: Application) {
     }
   }
 
+  def getRefrigs: Future[JsArray] = {
+    val soql = s"SELECT Id, Axeda_Device_ID__c FROM Refrigerator__c"
+
+    ws(s"query/").flatMap {
+      _.withQueryString("q" -> soql).get().flatMap { response =>
+        response.status match {
+          case Status.OK =>
+            Future.successful((response.json \ "records").as[JsArray])
+          case _ =>
+            Future.failed(new IllegalStateException(response.json.toString()))
+        }
+      }
+    }
+  }
+
   def getRefrig(id: String): Future[JsValue] = {
     ws(s"sobjects/Refrigerator__c/$id").flatMap {
       _.get().flatMap { response =>
@@ -107,42 +122,6 @@ class Salesforce(implicit app: Application) {
       }
     }
   }
-
-  /*
-  def escalateCase(id: String): Future[JsValue] = {
-    val json = Json.obj(
-      "Status" -> "Escalated",
-      "Priority" -> "High"
-    )
-    ws(s"sobjects/Case/$id").flatMap {
-      _.patch(json).flatMap { response =>
-        response.status match {
-          case Status.NO_CONTENT =>
-            addCaseComments(id, "Refrigerator door has been open for more than 1 minute")
-          case _ =>
-            Future.failed(new IllegalStateException("Could not escalate case"))
-        }
-      }
-    }
-  }
-
-  def addCaseComments(id: String, comments: String): Future[JsValue] = {
-    val json = Json.obj(
-      "ParentId" -> id,
-      "CommentBody" -> comments
-    )
-    ws(s"sobjects/CaseComment").flatMap {
-      _.post(json).flatMap { response =>
-        response.status match {
-          case Status.OK =>
-            Future.successful(response.json)
-          case _ =>
-            Future.failed(new IllegalStateException(response.json.toString()))
-        }
-      }
-    }
-  }
-  */
 
 }
 
